@@ -220,7 +220,7 @@ def hook():
             url_format = app.config['PUBLIC_URL_FORMAT']
         app.worker.send(
             app.config['FILENAME_FORMAT'].format(user=owner, repo=name),
-            url_format(user=owner, repo=name),
+            url_format.format(user=owner, repo=name),
         )
         return flask.jsonify(status='handled')
     else:
