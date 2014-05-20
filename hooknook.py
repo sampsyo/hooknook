@@ -7,6 +7,7 @@ import os
 import subprocess
 import traceback
 import yaml
+import datetime
 
 app = flask.Flask(__name__)
 app.config.update(
@@ -19,6 +20,9 @@ app.config.update(
 
 
 def load_config(repo_dir):
+    """Load the repository's configuration as a dictionary. Defaults are
+    used for missing keys.
+    """
     # Provide defaults.
     config = dict(app.config['CONFIG_DEFAULT'])
 
@@ -32,7 +36,80 @@ def load_config(repo_dir):
     return config
 
 
+def timestamp():
+    """Get a string indicating the current time.
+    """
+    now = datetime.datetime.now()
+    return now.strftime('%Y-%m-%d-%H-%M-%S-%f')
+
+
+def update_repo(repo, url):
+    """Clone or pull the repository. Return the updated repository
+    directory.
+    """
+    # Create the parent directory for repositories.
+    parent = os.path.join(app.config['DATA_DIR'], 'repo')
+    if not os.path.exists(parent):
+        os.makedirs(parent)
+
+    # Clone the repository or update it.
+    repo_dir = os.path.join(parent, repo)
+    # FIXME log
+    if os.path.exists(repo_dir):
+        subprocess.check_call(
+            ['git', 'fetch'], cwd=repo_dir
+        )
+        subprocess.check_call(
+            ['git', 'reset', '--hard', 'origin/master'],
+            cwd=repo_dir,
+        )
+    else:
+        subprocess.check_call(
+            ['git', 'clone', url, repo_dir],
+        )
+
+    return repo_dir
+
+
+def run_build(repo_dir):
+    """Run the build in the repository direction.
+    """
+    # Get the configuration.
+    config = load_config(repo_dir)
+
+    # Run the build.
+    try:
+        subprocess.check_call(
+            config['deploy'],
+            shell=True,
+            cwd=repo_dir,
+        )
+    except subprocess.CalledProcessError as exc:
+        app.logger.error(
+            'Deploy exited with status {}'.format(exc.returncode)
+        )
+
+
+def open_log(repo):
+    """Open a log file for a build and return the open file.
+
+    `repo` is the (filename-safe) name of the repository.
+    """
+    # Create the parent directory for the log files.
+    parent = os.path.join(app.config['DATA_DIR'], 'log')
+    if not os.path.exists(parent):
+        os.makedirs(parent)
+
+    # Get a log file for this build.
+    ts = timestamp()
+    log_fn = os.path.join(parent, '{}-{}.log'.format(repo, ts))
+
+    return open(log_fn, 'w')
+
+
 class Worker(threading.Thread):
+    """Thread used for invoking builds asynchronously.
+    """
     def __init__(self):
         super(Worker, self).__init__()
         self.daemon = True
@@ -48,46 +125,17 @@ class Worker(threading.Thread):
                 )
 
     def handle(self, repo, url):
+        """Execute a build.
+
+        `repo` is the (filename-safe) repository name. `url` is the git
+        clone URL for the repo.
+        """
         app.logger.info('Building {}'.format(repo))
 
-        # Create the parent directory for repositories.
-        parent = os.path.join(app.config['DATA_DIR'], 'repo')
-        if not os.path.exists(parent):
-            app.logger.info('Creating repository parent')
-            os.makedirs(parent)
+        with open_log(repo) as log:
+            repo_dir = update_repo(repo, url)
+            run_build(repo_dir)
 
-        # Clone the repository or update it.
-        repo_dir = os.path.join(parent, repo)
-        # FIXME log
-        if os.path.exists(repo_dir):
-            app.logger.info('Pulling {}'.format(repo))
-            subprocess.check_call(
-                ['git', 'fetch'], cwd=repo_dir
-            )
-            subprocess.check_call(
-                ['git', 'reset', '--hard', 'origin/master'],
-                cwd=repo_dir,
-            )
-        else:
-            app.logger.info('Cloning {}'.format(repo))
-            subprocess.check_call(
-                ['git', 'clone', url, repo_dir],
-            )
-
-        # Get the configuration.
-        config = load_config(repo_dir)
-
-        # Run the build.
-        try:
-            subprocess.check_call(
-                config['deploy'],
-                shell=True,
-                cwd=repo_dir,
-            )
-        except subprocess.CalledProcessError as exc:
-            app.logger.error(
-                'Deploy exited with status {}'.format(exc.returncode)
-            )
 
     def send(self, *args):
         self.queue.put(args)
