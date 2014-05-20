@@ -19,6 +19,7 @@ app.config.update(
     CONFIG_DEFAULT={
         'deploy': 'make deploy',
     },
+    USERS=(),
 )
 
 
@@ -47,6 +48,9 @@ def timestamp():
 
 
 def shell(command, logfile, cwd=None, shell=False):
+    """Execute a command (via a shell or directly) and log the stdout
+    and stderr streams to a file-like object.
+    """
     if shell:
         logline = command
     else:
@@ -126,6 +130,8 @@ class Worker(threading.Thread):
         self.queue = queue.Queue()
 
     def run(self):
+        """Wait for jobs and execute them with `handle`.
+        """
         while True:
             try:
                 self.handle(*self.queue.get())
@@ -147,6 +153,8 @@ class Worker(threading.Thread):
             run_build(repo_dir, log)
 
     def send(self, *args):
+        """Add a job to the queue.
+        """
         self.queue.put(args)
 
 
@@ -195,12 +203,17 @@ def hook():
         return flask.jsonify(status='pong')
     elif event_type == 'push':
         payload = request.get_json()
+        repo = payload['repository']
+
+        # If a user whitelist is specified, validate the owner.
+        owner = repo['owner']['name']
+        allowed_users = app.config['USERS']
+        if allowed_users and owner not in allowed_users:
+            return flask.jsonify(status='user not allowed', user=owner), 403
+
         app.worker.send(
-            '{}-{}'.format(
-                payload['repository']['owner']['name'],
-                payload['repository']['name']
-            ),
-            payload['repository']['url'],
+            '{}-{}'.format(owner, repo['name']),
+            repo['url'],
         )
         return flask.jsonify(status='handled')
     else:
@@ -208,12 +221,15 @@ def hook():
 
 
 @click.command()
-@click.argument('host', default='0.0.0.0')
-@click.argument('port', default=5000)
-@click.option('--debug', '-d', is_flag=True)
-def run(host, port, debug):
-    app.run(host=host, port=port, debug=debug)
+@click.option('--host', '-h', default='0.0.0.0', help='server hostname')
+@click.option('--port', '-p', default=5000, help='server port')
+@click.option('--debug', '-d', is_flag=True, help='run in debug mode')
+@click.option('--user', '-u', multiple=True, help='allowed GitHub users')
+def run(host, port, debug, user):
+    app.config['DEBUG'] = debug
+    app.config['USERS'] = user
+    app.run(host=host, port=port)
 
 
 if __name__ == '__main__':
-    run()
+    run(auto_envvar_prefix='HOOKNOOK')
