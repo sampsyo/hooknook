@@ -1,4 +1,3 @@
-from __future__ import print_function  # Just for flake8.
 import flask
 from flask import request
 import threading
@@ -20,6 +19,9 @@ app.config.update(
         'deploy': 'make deploy',
     },
     USERS=(),
+    FILENAME_FORMAT='{user}#{repo}',
+    PRIVATE_URL_FORMAT='git@github.com:{user}/{repo}.git',
+    PUBLIC_URL_FORMAT='https://github.com/{user}/{repo}.git',
 )
 
 
@@ -55,7 +57,7 @@ def shell(command, logfile, cwd=None, shell=False):
         logline = command
     else:
         logline = ' '.join(command)
-    print('$ {}'.format(logline), file=logfile)
+    logfile.write('$ {}\n'.format(logline))
     logfile.flush()
 
     subprocess.check_call(
@@ -207,13 +209,18 @@ def hook():
 
         # If a user whitelist is specified, validate the owner.
         owner = repo['owner']['name']
+        name = repo['name']
         allowed_users = app.config['USERS']
         if allowed_users and owner not in allowed_users:
             return flask.jsonify(status='user not allowed', user=owner), 403
 
+        if repo['private']:
+            url_format = app.config['PRIVATE_URL_FORMAT']
+        else:
+            url_format = app.config['PUBLIC_URL_FORMAT']
         app.worker.send(
-            '{}-{}'.format(owner, repo['name']),
-            repo['url'],
+            app.config['FILENAME_FORMAT'].format(user=owner, repo=name),
+            url_format(user=owner, repo=name),
         )
         return flask.jsonify(status='handled')
     else:
