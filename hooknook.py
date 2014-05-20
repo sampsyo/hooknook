@@ -1,6 +1,6 @@
 from __future__ import print_function  # Just for flake8.
 import flask
-from flask import request, g
+from flask import request
 import threading
 import queue
 import click
@@ -9,6 +9,8 @@ import subprocess
 import traceback
 import yaml
 import datetime
+import netaddr
+import requests
 
 app = flask.Flask(__name__)
 app.config.update(
@@ -148,17 +150,43 @@ class Worker(threading.Thread):
         self.queue.put(args)
 
 
-@app.before_request
-def _setup():
-    if not hasattr(g, 'worker'):
-        g.worker = Worker()
-        g.worker.start()
+@app.before_first_request
+def app_setup():
+    """Ensure that the application has some shared global attributes set
+    up:
+
+    - `worker` is a Worker thread
+    - `github_networks` is the list of valid origin IPNetworks
+    """
+    # Create a worker thread.
+    if not hasattr(app, 'worker'):
+        app.worker = Worker()
+        app.worker.start()
+
+    # Load the valid GitHub hook server IP ranges from the GitHub API.
+    if not hasattr(app, 'github_networks'):
+        meta = requests.get('https://api.github.com/meta').json()
+        app.github_networks = []
+        for cidr in meta['hooks']:
+            app.github_networks.append(netaddr.IPNetwork(cidr))
+        app.logger.info(
+            'Loaded GitHub networks: {}'.format(len(app.github_networks))
+        )
 
 
 @app.route('/hook', methods=['POST'])
 def hook():
-    # FIXME Validate GitHub request origin.
+    """The web hook endpoint. This is the URL that GitHub uses to send
+    hooks.
+    """
+    # Ensure that the request is from a GitHub server.
+    for network in app.github_networks:
+        if request.remote_addr in network:
+            break
+    else:
+        return flask.jsonify(status='you != GitHub'), 403
 
+    # Dispatch based on event type.
     event_type = request.headers.get('X-GitHub-Event')
     if not event_type:
         app.logger.info('Received a non-hook request')
@@ -167,7 +195,7 @@ def hook():
         return flask.jsonify(status='pong')
     elif event_type == 'push':
         payload = request.get_json()
-        g.worker.send(
+        app.worker.send(
             '{}-{}'.format(
                 payload['repository']['owner']['name'],
                 payload['repository']['name']
