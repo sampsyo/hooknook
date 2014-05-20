@@ -43,7 +43,25 @@ def timestamp():
     return now.strftime('%Y-%m-%d-%H-%M-%S-%f')
 
 
-def update_repo(repo, url):
+def shell(command, logfile, cwd=None, shell=False):
+    if shell:
+        logline = command
+    else:
+        logline = ' '.join(command)
+    print('$ {}'.format(logline), file=logfile)
+    logfile.flush()
+
+    subprocess.check_call(
+        command,
+        cwd=cwd,
+        stdout=logfile,
+        stderr=subprocess.STDOUT,
+        shell=shell,
+    )
+    logfile.flush()
+
+
+def update_repo(repo, url, log):
     """Clone or pull the repository. Return the updated repository
     directory.
     """
@@ -56,22 +74,15 @@ def update_repo(repo, url):
     repo_dir = os.path.join(parent, repo)
     # FIXME log
     if os.path.exists(repo_dir):
-        subprocess.check_call(
-            ['git', 'fetch'], cwd=repo_dir
-        )
-        subprocess.check_call(
-            ['git', 'reset', '--hard', 'origin/master'],
-            cwd=repo_dir,
-        )
+        shell(['git', 'fetch'], log, repo_dir)
+        shell(['git', 'reset', '--hard', 'origin/master'], log, repo_dir)
     else:
-        subprocess.check_call(
-            ['git', 'clone', url, repo_dir],
-        )
+        shell(['git', 'clone', url, repo_dir], log)
 
     return repo_dir
 
 
-def run_build(repo_dir):
+def run_build(repo_dir, log):
     """Run the build in the repository direction.
     """
     # Get the configuration.
@@ -79,11 +90,7 @@ def run_build(repo_dir):
 
     # Run the build.
     try:
-        subprocess.check_call(
-            config['deploy'],
-            shell=True,
-            cwd=repo_dir,
-        )
+        shell(config['deploy'], log, repo_dir, True)
     except subprocess.CalledProcessError as exc:
         app.logger.error(
             'Deploy exited with status {}'.format(exc.returncode)
@@ -133,8 +140,8 @@ class Worker(threading.Thread):
         app.logger.info('Building {}'.format(repo))
 
         with open_log(repo) as log:
-            repo_dir = update_repo(repo, url)
-            run_build(repo_dir)
+            repo_dir = update_repo(repo, url, log)
+            run_build(repo_dir, log)
 
 
     def send(self, *args):
