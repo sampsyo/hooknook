@@ -6,6 +6,10 @@ You can use it to run "your own GitHub Pages," where every time you push a site'
 
 ## How to Hooknook
 
+Install it like this:
+
+    $ pip3 install -r requirements.txt
+
 Run it like this:
 
     $ python3 hooknook.py -u USERNAME
