@@ -157,17 +157,16 @@ def _setup():
 
 @app.route('/hook', methods=['POST'])
 def hook():
+    # FIXME Validate GitHub request origin.
+
     event_type = request.headers.get('X-GitHub-Event')
     if not event_type:
         log.info('Received a non-hook request')
         return flask.jsonify(status='not a hook'), 403
     elif event_type == 'ping':
         return flask.jsonify(ping='pong')
-
-    # FIXME Validate GitHub request origin.
-
-    payload = request.get_json()
-    if 'repository' in payload:
+    elif event_type == 'push':
+        payload = request.get_json()
         g.worker.send(
             '{}-{}'.format(
                 payload['repository']['owner']['name'],
@@ -175,7 +174,9 @@ def hook():
             ),
             payload['repository']['url'],
         )
-    return flask.jsonify(status='success')
+        return flask.jsonify(status='success')
+    else:
+        return flask.jsonify(status='unhandled event', event=event_type), 501
 
 
 @click.command()
