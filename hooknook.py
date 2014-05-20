@@ -6,11 +6,30 @@ import click
 import os
 import subprocess
 import traceback
+import yaml
 
 app = flask.Flask(__name__)
 app.config.update(
     DATA_DIR = os.path.expanduser(os.path.join('~', '.hooknook')),
+    CONFIG_FILENAME = '.hook.yaml',
+    CONFIG_DEFAULT = {
+        'deploy': 'make deploy',
+    },
 )
+
+
+def load_config(repo_dir):
+    # Provide defaults.
+    config = dict(app.config['CONFIG_DEFAULT'])
+
+    # Load the configuration file, if any.
+    config_fn = os.path.join(repo_dir, app.config['CONFIG_FILENAME'])
+    if os.path.exists(config_fn):
+        with open(config_fn) as f:
+            overlay = yaml.load(f)
+        config.update(overlay)
+
+    return config
 
 
 class Worker(threading.Thread):
@@ -42,16 +61,31 @@ class Worker(threading.Thread):
         # FIXME log
         if os.path.exists(repo_dir):
             app.logger.info('Pulling {}'.format(repo))
-            subprocess.check_output(
+            subprocess.check_call(
                 ['git', 'fetch'], cwd=repo_dir
             )
-            subprocess.check_output(
+            subprocess.check_call(
                 ['git', 'checkout', '-f', 'master'], cwd=repo_dir
             )
         else:
             app.logger.info('Cloning {}'.format(repo))
-            subprocess.check_output(
+            subprocess.check_call(
                 ['git', 'clone', url, repo_dir],
+            )
+
+        # Get the configuration.
+        config = load_config(repo_dir)
+
+        # Run the build.
+        try:
+            subprocess.check_call(
+                config['deploy'],
+                shell=True,
+                cwd=repo_dir,
+            )
+        except subprocess.CalledProcessError as exc:
+            app.logger.error(
+                'Deploy exited with status {}'.format(exc.returncode)
             )
 
     def send(self, *args):
