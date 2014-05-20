@@ -4,6 +4,8 @@ import threading
 import queue
 import click
 import os
+import subprocess
+import traceback
 
 app = flask.Flask(__name__)
 app.config.update(
@@ -19,20 +21,48 @@ class Worker(threading.Thread):
 
     def run(self):
         while True:
-            self.handle(self.queue.get())
+            try:
+                self.handle(*self.queue.get())
+            except:
+                app.logger.error(
+                    'Worker exception:\n' + traceback.format_exc()
+                )
 
-    def handle(args):
-        print(args)
-        print(app.config['DATA_DIR'])
+    def handle(self, repo, url):
+        app.logger.info('Building {}'.format(repo))
+
+        # Create the parent directory for repositories.
+        parent = os.path.join(app.config['DATA_DIR'], 'repo')
+        if not os.path.exists(parent):
+            app.logger.info('Creating repository parent')
+            os.makedirs(parent)
+
+        # Clone the repository or update it.
+        repo_dir = os.path.join(parent, repo)
+        # FIXME log
+        if os.path.exists(repo_dir):
+            app.logger.info('Pulling {}'.format(repo))
+            subprocess.check_output(
+                ['git', 'fetch'], cwd=repo_dir
+            )
+            subprocess.check_output(
+                ['git', 'checkout', '-f', 'master'], cwd=repo_dir
+            )
+        else:
+            app.logger.info('Cloning {}'.format(repo))
+            subprocess.check_output(
+                ['git', 'clone', url, repo_dir],
+            )
 
     def send(self, *args):
         self.queue.put(args)
 
 
-@app.before_first_request
+@app.before_request
 def _setup():
-    g.worker = Worker()
-    g.worker.start()
+    if not hasattr(g, 'worker'):
+        g.worker = Worker()
+        g.worker.start()
 
 
 @app.route('/hook', methods=['POST'])
@@ -47,10 +77,14 @@ def hook():
     # FIXME Validate GitHub request origin.
 
     payload = request.get_json()
-    app.logger.info(payload)
     if 'repository' in payload:
-        g.worker.send(payload['repository']['owner'],
-                      payload['repository']['name'])
+        g.worker.send(
+            '{}-{}'.format(
+                payload['repository']['owner']['name'],
+                payload['repository']['name']
+            ),
+            payload['repository']['url'],
+        )
     return flask.jsonify(status='success')
 
 
