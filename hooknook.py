@@ -222,7 +222,7 @@ def hook():
             app.config['FILENAME_FORMAT'].format(user=owner, repo=name),
             url_format.format(user=owner, repo=name),
         )
-        return flask.jsonify(status='handled')
+        return flask.jsonify(status='handled'), 202
     else:
         return flask.jsonify(status='unhandled event', event=event_type), 501
 
