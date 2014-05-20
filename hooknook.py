@@ -1,3 +1,4 @@
+from __future__ import print_function  # Just for flake8.
 import flask
 from flask import request, g
 import threading
@@ -11,9 +12,9 @@ import datetime
 
 app = flask.Flask(__name__)
 app.config.update(
-    DATA_DIR = os.path.expanduser(os.path.join('~', '.hooknook')),
-    CONFIG_FILENAME = '.hook.yaml',
-    CONFIG_DEFAULT = {
+    DATA_DIR=os.path.expanduser(os.path.join('~', '.hooknook')),
+    CONFIG_FILENAME='.hook.yaml',
+    CONFIG_DEFAULT={
         'deploy': 'make deploy',
     },
 )
@@ -143,7 +144,6 @@ class Worker(threading.Thread):
             repo_dir = update_repo(repo, url, log)
             run_build(repo_dir, log)
 
-
     def send(self, *args):
         self.queue.put(args)
 
@@ -161,10 +161,10 @@ def hook():
 
     event_type = request.headers.get('X-GitHub-Event')
     if not event_type:
-        log.info('Received a non-hook request')
+        app.logger.info('Received a non-hook request')
         return flask.jsonify(status='not a hook'), 403
     elif event_type == 'ping':
-        return flask.jsonify(ping='pong')
+        return flask.jsonify(status='pong')
     elif event_type == 'push':
         payload = request.get_json()
         g.worker.send(
@@ -174,7 +174,7 @@ def hook():
             ),
             payload['repository']['url'],
         )
-        return flask.jsonify(status='success')
+        return flask.jsonify(status='handled')
     else:
         return flask.jsonify(status='unhandled event', event=event_type), 501
 
