@@ -65,7 +65,8 @@ class Worker(threading.Thread):
                 ['git', 'fetch'], cwd=repo_dir
             )
             subprocess.check_call(
-                ['git', 'checkout', '-f', 'master'], cwd=repo_dir
+                ['git', 'reset', '--hard', 'origin/master'],
+                cwd=repo_dir,
             )
         else:
             app.logger.info('Cloning {}'.format(repo))
