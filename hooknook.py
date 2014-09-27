@@ -79,6 +79,15 @@ def random_string(length=20, chars=(string.ascii_letters + string.digits)):
     return ''.join(random.choice(chars) for i in range(length))
 
 
+def github_get(path, token=None, base='https://api.github.com'):
+    """Make a request to the GitHub API."""
+    token = token or flask.session['github_token']
+    url = '{}/{}'.format(base, path)
+    return requests.get(url, params={
+        'access_token': token,
+    })
+
+
 def update_repo(repo, url, log):
     """Clone or pull the repository. Return the updated repository
     directory.
@@ -258,16 +267,19 @@ def login():
 
 @app.route('/auth')
 def auth():
-    """Receive a callback from GitHub's authenticaiton."""
+    """Receive a callback from GitHub's authentication."""
     if not app.config['GITHUB_ID']:
         return 'GitHub API disabled', 501
-    print(request.form)
+
+    # Get the code from the callback.
     if flask.session.get('auth_state') != request.args['state']:
         app.logger.error(
             'Invalid state from GitHub auth (possible CSRF)'
         )
         return 'invalid request state', 403
     code = request.args['code']
+
+    # Turn this into an access token.
     resp = requests.post(
         'https://github.com/login/oauth/access_token',
         data={
@@ -277,10 +289,24 @@ def auth():
         }
     )
     token = urllib.parse.parse_qs(resp.text)['access_token'][0]
-    flask.session['github_token'] = token
     app.logger.info(
         'Authorized token with GitHub: {}'.format(token),
     )
+
+    # Check that the user is on the whitelist.
+    flask.session['github_token'] = token
+    user_data = github_get('user', token=token).json()
+    # TODO: Check for organization membership too.
+    username = user_data['login']
+    if username not in app.config['USERS']:
+        app.logger.warn(
+            'GitHub user not allowed: {}'.format(username)
+        )
+        return 'you are not allowed', 403
+
+    # Mark the user as logged in.
+    flask.session['github_token'] = token
+
     return flask.redirect('/')
 
 
