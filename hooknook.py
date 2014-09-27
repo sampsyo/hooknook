@@ -293,6 +293,19 @@ def home():
         return 'not yet'
 
 
+@app.route('/log/<name>')
+def show_log(name):
+    token = flask.session.get('github_token')
+    if not token:
+        return 'no can do', 403
+    log_dir = os.path.join(app.config['DATA_DIR'], 'log')
+    log_name = os.path.basename(name)  # Avoid any directories in path.
+    log_path = os.path.join(log_dir, log_name)
+    if not os.path.exists(log_path):
+        return 'no such log', 404
+    return flask.send_file(log_path, mimetype='text/plain')
+
+
 @click.command()
 @click.option('--host', '-h', default='0.0.0.0', help='server hostname')
 @click.option('--port', '-p', default=5000, help='server port')
