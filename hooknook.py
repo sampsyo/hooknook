@@ -10,6 +10,9 @@ import yaml
 import datetime
 import netaddr
 import requests
+import string
+import random
+import urllib.parse
 
 app = flask.Flask(__name__)
 app.config.update(
@@ -22,6 +25,8 @@ app.config.update(
     FILENAME_FORMAT='{user}#{repo}',
     PRIVATE_URL_FORMAT='git@github.com:{user}/{repo}.git',
     PUBLIC_URL_FORMAT='https://github.com/{user}/{repo}.git',
+    GITHUB_ID=None,
+    GITHUB_SECRET=None,
 )
 
 
@@ -68,6 +73,10 @@ def shell(command, logfile, cwd=None, shell=False):
         shell=shell,
     )
     logfile.flush()
+
+
+def random_string(length=20, chars=(string.ascii_letters + string.digits)):
+    return ''.join(random.choice(chars) for i in range(length))
 
 
 def update_repo(repo, url, log):
@@ -227,14 +236,77 @@ def hook():
         return flask.jsonify(status='unhandled event', event=event_type), 501
 
 
+@app.route('/login')
+def login():
+    """Redirect to GitHub for authentication."""
+    if not app.config['GITHUB_ID']:
+        return 'GitHub API disabled', 501
+    auth_state = flask.session['auth_state'] = random_string()
+    auth_url = '{}?{}'.format(
+        'https://github.com/login/oauth/authorize',
+        urllib.parse.urlencode({
+            'client_id': app.config['GITHUB_ID'],
+            'scope': 'write:repo_hook',
+            'state': auth_state,
+        }),
+    )
+    app.logger.info(
+        'Authorizing with GitHub at {}'.format(auth_url),
+    )
+    return flask.redirect(auth_url)
+
+
+@app.route('/auth')
+def auth():
+    """Receive a callback from GitHub's authenticaiton."""
+    if not app.config['GITHUB_ID']:
+        return 'GitHub API disabled', 501
+    print(request.form)
+    if flask.session.get('auth_state') != request.args['state']:
+        app.logger.error(
+            'Invalid state from GitHub auth (possible CSRF)'
+        )
+        return 'invalid request state', 403
+    code = request.args['code']
+    resp = requests.post(
+        'https://github.com/login/oauth/access_token',
+        data={
+            'client_id': app.config['GITHUB_ID'],
+            'client_secret': app.config['GITHUB_SECRET'],
+            'code': code,
+        }
+    )
+    token = urllib.parse.parse_qs(resp.text)['access_token'][0]
+    flask.session['github_token'] = token
+    app.logger.info(
+        'Authorized token with GitHub: {}'.format(token),
+    )
+    return flask.redirect('/')
+
+
+@app.route('/')
+def home():
+    token = flask.session.get('github_token')
+    if token:
+        return 'authorized'
+    else:
+        return 'not yet'
+
+
 @click.command()
 @click.option('--host', '-h', default='0.0.0.0', help='server hostname')
 @click.option('--port', '-p', default=5000, help='server port')
 @click.option('--debug', '-d', is_flag=True, help='run in debug mode')
 @click.option('--user', '-u', multiple=True, help='allowed GitHub users')
-def run(host, port, debug, user):
+@click.option('--github', '-g', help='GitHub client id:secret')
+@click.option('--secret', '-s', help='application secret key')
+def run(host, port, debug, user, github, secret):
     app.config['DEBUG'] = debug
     app.config['USERS'] = user
+    if github and ':' in github:
+        app.config['GITHUB_ID'], app.config['GITHUB_SECRET'] = \
+            github.split(':', 1)
+    app.config['SECRET_KEY'] = secret or random_string()
     app.run(host=host, port=port)
 
 
