@@ -319,9 +319,13 @@ def auth():
 def home():
     token = flask.session.get('github_token')
     if token:
-        filenames = os.listdir(log_dir())
-        # TODO sort by date.
-        return flask.render_template('logs.html', logs=filenames)
+        # Sort log files by mtime.
+        ld = log_dir()
+        file_stats = [(fn, os.stat(os.path.join(ld, fn)))
+                      for fn in os.listdir(ld)]
+        file_stats.sort(key=lambda p: p[1].st_mtime, reverse=True)
+        file_names = [fn for fn, _ in file_stats]
+        return flask.render_template('logs.html', logs=file_names[:10])
     else:
         return 'not yet'
 
