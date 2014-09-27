@@ -124,13 +124,18 @@ def run_build(repo_dir, log):
         )
 
 
+def log_dir():
+    """The directory for storing logs."""
+    return os.path.join(app.config['DATA_DIR'], 'log')
+
+
 def open_log(repo):
     """Open a log file for a build and return the open file.
 
     `repo` is the (filename-safe) name of the repository.
     """
     # Create the parent directory for the log files.
-    parent = os.path.join(app.config['DATA_DIR'], 'log')
+    parent = log_dir()
     if not os.path.exists(parent):
         os.makedirs(parent)
 
@@ -314,7 +319,9 @@ def auth():
 def home():
     token = flask.session.get('github_token')
     if token:
-        return 'authorized'
+        filenames = os.listdir(log_dir())
+        # TODO sort by date.
+        return flask.render_template('logs.html', logs=filenames)
     else:
         return 'not yet'
 
@@ -324,9 +331,8 @@ def show_log(name):
     token = flask.session.get('github_token')
     if not token:
         return 'no can do', 403
-    log_dir = os.path.join(app.config['DATA_DIR'], 'log')
     log_name = os.path.basename(name)  # Avoid any directories in path.
-    log_path = os.path.join(log_dir, log_name)
+    log_path = os.path.join(log_dir(), log_name)
     if not os.path.exists(log_path):
         return 'no such log', 404
     return flask.send_file(log_path, mimetype='text/plain')
