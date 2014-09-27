@@ -327,7 +327,7 @@ def home():
         file_names = [fn for fn, _ in file_stats]
         return flask.render_template('logs.html', logs=file_names[:10])
     else:
-        return 'not yet'
+        return flask.render_template('login.html')
 
 
 @app.route('/log/<name>')

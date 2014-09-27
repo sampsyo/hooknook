@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Hooknook</h1>
+<p>
+    {% if config.GITHUB_ID %}
+    <a href="{{ url_for('login') }}">Log in with GitHub.</a>
+    {% else %}
+    Look! Hooknook.
+    {% endif %}
+</p>
+{% endblock %}
