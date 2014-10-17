@@ -22,12 +22,14 @@ app.config.update(
         'deploy': 'make deploy',
     },
     USERS=(),
-    FILENAME_FORMAT='{user}#{repo}',
     PRIVATE_URL_FORMAT='git@github.com:{user}/{repo}.git',
     PUBLIC_URL_FORMAT='https://github.com/{user}/{repo}.git',
     GITHUB_ID=None,
     GITHUB_SECRET=None,
 )
+
+FILENAME_FORMAT = '{user}#{repo}'
+TIMESTAMP_FORMAT = '%Y-%m-%d-%H-%M-%S-%f'
 
 
 def load_config(repo_dir):
@@ -51,7 +53,7 @@ def timestamp():
     """Get a string indicating the current time.
     """
     now = datetime.datetime.now()
-    return now.strftime('%Y-%m-%d-%H-%M-%S-%f')
+    return now.strftime(TIMESTAMP_FORMAT)
 
 
 def shell(command, logfile, cwd=None, shell=False):
@@ -141,7 +143,7 @@ def open_log(repo):
 
     # Get a log file for this build.
     ts = timestamp()
-    log_fn = os.path.join(parent, '{}-{}.log'.format(repo, ts))
+    log_fn = os.path.join(parent, '{}#{}.log'.format(repo, ts))
 
     return open(log_fn, 'w')
 
@@ -242,7 +244,7 @@ def hook():
         else:
             url_format = app.config['PUBLIC_URL_FORMAT']
         app.worker.send(
-            app.config['FILENAME_FORMAT'].format(user=owner, repo=name),
+            FILENAME_FORMAT.format(user=owner, repo=name),
             url_format.format(user=owner, repo=name),
         )
         return flask.jsonify(status='handled'), 202
@@ -319,13 +321,29 @@ def auth():
 def home():
     token = flask.session.get('github_token')
     if token:
-        # Sort log files by mtime.
-        ld = log_dir()
-        file_stats = [(fn, os.stat(os.path.join(ld, fn)))
-                      for fn in os.listdir(ld)]
-        file_stats.sort(key=lambda p: p[1].st_mtime, reverse=True)
-        file_names = [fn for fn, _ in file_stats]
-        return flask.render_template('logs.html', logs=file_names[:10])
+        # Parse each filename.
+        logs = []
+        for fn in os.listdir(log_dir()):
+            if fn.endswith('.log'):
+                name, _ = fn.rsplit('.', 1)
+                try:
+                    user, repo, stamp = name.split('#')
+                    dt = datetime.datetime.strptime(stamp, TIMESTAMP_FORMAT)
+                except ValueError:
+                    continue
+                logs.append({
+                    'user': user,
+                    'repo': repo,
+                    'name': '{}/{}'.format(user, repo),
+                    'dt': dt,
+                    'file': fn,
+                })
+
+        # Sort by time.
+        logs.sort(key=lambda l: l['dt'], reverse=True)
+
+        return flask.render_template('logs.html', logs=logs[:10])
+
     else:
         return flask.render_template('login.html')
 

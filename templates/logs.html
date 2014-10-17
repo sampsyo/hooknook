@@ -1,11 +1,26 @@
 {% extends "base.html" %}
 {% block content %}
+<div class="row">
+<div class="col-md-8 col-md-offset-2">
 <h1>Hooknook: Logs</h1>
-<ul class="list-unstyled">
-    {% for logname in logs %}
-    <li>
-        <a href="{{ url_for('show_log', name=logname) }}">{{ logname }}</a>
-    </li>
+<table class="table table-striped">
+    <thead><tr>
+      <th>Repository</th>
+      <th>Build Time</th>
+    </tr></thead>
+    {% for log in logs %}
+    <tr>
+        <td>
+            <a href="https://github.com/{{ log.name }}">{{ log.name }}</a>
+        </td>
+        <td>
+            <a href="{{ url_for('show_log', name=log.file) }}">
+                {{ log.dt.strftime('%d %b %Y %l:%M %p') }}
+            </a>
+        </td>
+    </tr>
     {% endfor %}
-</ul>
+</table>
+</div>
+</div>
 {% endblock %}
