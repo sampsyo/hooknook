@@ -62,3 +62,41 @@ If you use a config file instead of command-line flags, you can run Hooknook on 
     $ gunicorn --workers 4 --bind 0.0.0.0:5000 hooknook:app
 
 [Gunicorn]: http://gunicorn.org/
+
+### Running via Launchctl on OSX
+
+Or how to avoid getting rooked running hooknook on your Mac-book (actually, you should probably be running this on a desktop machine, but those don't rhyme).
+
+There are a couple caveats when trying to configure hooknook to run automatically in daemon mode on OSX. Python 3 and Click, which is used by hooknook for parsing configuration options, [do not always play nicely together](http://click.pocoo.org/3/python3/). When running via a launchd script, you need to be sure to set the locale correctly in the environment.
+
+Assuming you've installed python3 the way everyone does (via [homebrew](http://brew.sh)), and that you've cloned hooknook into `/opt/hooknook`, and assuming your user is named "peregrintook" (locally and on Github), your launchd configuration, `/Library/LaunchDaemons/edu.uw.hooknook.plist`, might look like:
+
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+    <dict>
+      <key>Label</key><string>edu.uw.hooknook</string>
+      <key>UserName</key><string>peregrintook</string>
+      <key>KeepAlive</key><true/>
+      <key>RunAtLoad</key><true/>
+      <key>EnvironmentVariables</key>
+        <dict>
+          <key>LC_ALL</key><string>en_US.UTF-8</string>
+          <key>LANG</key><string>en_US.UTF-8</string>
+        </dict>
+      <key>ProgramArguments</key>
+        <array>
+          <string>/usr/local/bin/python3</string>
+          <string>hooknook.py</string>
+          <string>-u</string>
+          <string>peregrintook</string>
+        </array>
+      <key>WorkingDirectory</key><string>/opt/hooknook</string>
+      <key>StandardOutPath</key><string>hooknook.log</string>
+      <key>StandardErrorPath</key><string>hooknook.log</string>
+    </dict>
+    </plist>
+
+This daemon can be started with:
+
+    sudo launchctl load /Library/LaunchDaemons/edu.uw.hooknook.plist
+
