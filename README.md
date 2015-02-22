@@ -55,4 +55,10 @@ The configuration options are:
 
 * `USERS` or `-u USER`: A list of whitelisted GitHub user/organization names.
 * `GITHUB_ID` and `GITHUB_SECRET` or `-g ID:SECRET`: GitHub API credentials.
-* `SECRET`: A secret string for signing trusted data.
+* `SECRET_KEY`: A secret string for signing trusted data.
+
+If you use a config file instead of command-line flags, you can run Hooknook on a proper HTTP server (probably a good idea!). For example, run it with [Gunicorn][] like so:
+
+    $ gunicorn --workers 4 --bind 0.0.0.0:5000 hooknook:app
+
+[Gunicorn]: http://gunicorn.org/
