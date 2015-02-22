@@ -46,3 +46,13 @@ You'll now see a list of the most recent logs on the server.
 Currently, all whitelisted users can view all logs. In the future, users will only be able to see logs for repositories they have access to.
 
 [gh-app-new]: https://github.com/settings/applications/new
+
+## Configuration
+
+You can configure Hooknook with command-line flags or a configuration file. Hooknook looks for a (Python) file called `hooknook.cfg` by default, and you can also supply a `HOOKNOOK_CFG` environment variable to point to another path if you like.
+
+The configuration options are:
+
+* `USERS` or `-u USER`: A list of whitelisted GitHub user/organization names.
+* `GITHUB_ID` and `GITHUB_SECRET` or `-g ID:SECRET`: GitHub API credentials.
+* `SECRET`: A secret string for signing trusted data.

@@ -27,6 +27,8 @@ app.config.update(
     GITHUB_ID=None,
     GITHUB_SECRET=None,
 )
+app.config.from_pyfile('hooknook.cfg', silent=True)
+app.config.from_envvar('HOOKNOOK_CFG', silent=True)
 
 FILENAME_FORMAT = '{user}#{repo}'
 TIMESTAMP_FORMAT = '%Y-%m-%d-%H-%M-%S-%f'
