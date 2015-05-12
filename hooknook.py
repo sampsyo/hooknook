@@ -211,7 +211,8 @@ def app_setup():
         )
 
 
-@app.route('/hook', methods=['POST'])
+@app.route('/', methods=['POST'])
+@app.route('/hook', methods=['POST'])  # Backwards-compatibility.
 def hook():
     """The web hook endpoint. This is the URL that GitHub uses to send
     hooks.

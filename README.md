@@ -16,7 +16,7 @@ Run it like this:
 
 It's a good idea to specify the GitHub users that are allowed to use your server. Otherwise, anyone can look in the Hooknook. The `-u` option can be specified multiple times and also works for organizations. If you don't specify any users, anyone will be allowed. (We filter requests by IP address, so you can't get burned by Hooknook crooks pretending to be GitHub.)
 
-Then, set up a GitHub web hook to point at the `http://example.com:5000/hook` on your server.
+Then, set up a GitHub web hook to point at your server: something like `http://example.com:5000`.
 
 Every time you push to your repository, Hooknook will update your repository in `~/.hooknook/repo` and run `make deploy`. Use a Makefile to describe what to do.
 
