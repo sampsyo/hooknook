@@ -304,7 +304,6 @@ def auth():
     )
 
     # Check that the user is on the whitelist.
-    flask.session['github_token'] = token
     user_data = github_get('user', token=token).json()
     # TODO: Check for organization membership too.
     username = user_data['login']
