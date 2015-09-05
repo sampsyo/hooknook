@@ -325,21 +325,23 @@ def home():
     if token:
         # Parse each filename.
         logs = []
-        for fn in os.listdir(log_dir()):
-            if fn.endswith('.log'):
-                name, _ = fn.rsplit('.', 1)
-                try:
-                    user, repo, stamp = name.split('#')
-                    dt = datetime.datetime.strptime(stamp, TIMESTAMP_FORMAT)
-                except ValueError:
-                    continue
-                logs.append({
-                    'user': user,
-                    'repo': repo,
-                    'name': '{}/{}'.format(user, repo),
-                    'dt': dt,
-                    'file': fn,
-                })
+        parent = log_dir()
+        if os.path.exists(parent):
+            for fn in os.listdir(parent):
+                if fn.endswith('.log'):
+                    name, _ = fn.rsplit('.', 1)
+                    try:
+                        user, repo, stamp = name.split('#')
+                        dt = datetime.datetime.strptime(stamp, TIMESTAMP_FORMAT)
+                    except ValueError:
+                        continue
+                    logs.append({
+                        'user': user,
+                        'repo': repo,
+                        'name': '{}/{}'.format(user, repo),
+                        'dt': dt,
+                        'file': fn,
+                    })
 
         # Sort by time.
         logs.sort(key=lambda l: l['dt'], reverse=True)
