@@ -265,7 +265,7 @@ def login():
         'https://github.com/login/oauth/authorize',
         urllib.parse.urlencode({
             'client_id': app.config['GITHUB_ID'],
-            'scope': 'write:repo_hook',
+            'scope': 'read:org,write:repo_hook',
             'state': auth_state,
         }),
     )
@@ -305,13 +305,19 @@ def auth():
 
     # Check that the user is on the whitelist.
     user_data = github_get('user', token=token).json()
-    # TODO: Check for organization membership too.
     username = user_data['login']
     if username not in app.config['USERS']:
-        app.logger.warn(
-            'GitHub user not allowed: {}'.format(username)
-        )
-        return 'you are not allowed', 403
+        # Check if the user is in a whitelisted org.
+        # TODO: handle pagination if the user is in > 30 orgs
+        org_data = github_get('user/orgs', token=token).json()
+        for org in org_data:
+            if org['login'] in app.config['USERS']:
+                break
+        else:
+            app.logger.warn(
+                'GitHub user not allowed: {}'.format(username)
+            )
+            return 'you are not allowed', 403
 
     # Mark the user as logged in.
     flask.session['github_token'] = token
