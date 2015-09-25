@@ -378,12 +378,17 @@ def show_log(name):
 @click.option('--github', '-g', help='GitHub client id:secret')
 @click.option('--secret', '-s', help='application secret key')
 def run(host, port, debug, user, github, secret):
-    app.config['DEBUG'] = debug
-    app.config['USERS'] = user
+    if debug:
+        app.config['DEBUG'] = debug
+    if user:
+        app.config['USERS'] = user
     if github and ':' in github:
         app.config['GITHUB_ID'], app.config['GITHUB_SECRET'] = \
             github.split(':', 1)
-    app.config['SECRET_KEY'] = secret or random_string()
+    if secret:
+        app.config['SECRET_KEY'] = secret
+    elif not app.config.get('SECRET_KEY'):
+        app.config['SECRET_KEY'] = random_string()
     app.run(host=host, port=port)
 
 
