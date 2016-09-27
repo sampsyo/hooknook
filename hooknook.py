@@ -214,7 +214,8 @@ def app_setup():
         for cidr in meta['hooks']:
             app.github_networks.append(netaddr.IPNetwork(cidr))
         app.logger.info(
-            'Loaded GitHub networks: {}'.format(len(app.github_networks))
+            'Loaded GitHub networks: %s',
+            [str(n) for n in app.github_networks]
         )
 
 
@@ -229,6 +230,8 @@ def hook():
         if request.remote_addr in network:
             break
     else:
+        app.logger.info('Hook request from disallowed host %s',
+                        request.remote_addr)
         return flask.jsonify(status='you != GitHub'), 403
 
     # Dispatch based on event type.
