@@ -13,6 +13,7 @@ import requests
 import string
 import random
 import urllib.parse
+import logging
 
 app = flask.Flask(__name__)
 app.config.update(
@@ -195,6 +196,12 @@ def app_setup():
     - `worker` is a Worker thread
     - `github_networks` is the list of valid origin IPNetworks
     """
+    # Set up logging.
+    if not app.debug:
+        # (Flask turns on logging itself in debug mode.)
+        app.logger.addHandler(logging.StreamHandler())
+        app.logger.setLevel(logging.INFO)
+
     # Create a worker thread.
     if not hasattr(app, 'worker'):
         app.worker = Worker()
