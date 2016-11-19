@@ -27,6 +27,7 @@ app.config.update(
     PUBLIC_URL_FORMAT='https://github.com/{user}/{repo}.git',
     GITHUB_ID=None,
     GITHUB_SECRET=None,
+    PROXIED=False,
 )
 app.config.from_pyfile('hooknook.cfg', silent=True)
 app.config.from_envvar('HOOKNOOK_CFG', silent=True)
@@ -151,6 +152,19 @@ def open_log(repo):
     return open(log_fn, 'w')
 
 
+def client_addr(request):
+    """Get the remote address for a request.
+
+    If the application has proxying enabled, this might come from the
+    X-Forwarded-For header. Otherwise, it is the host on the other end
+    of the connection for the request.
+    """
+    if app.config['PROXIED']:
+        return request.access_route[0]
+    else:
+        return request.remote_addr
+
+
 class Worker(threading.Thread):
     """Thread used for invoking builds asynchronously.
     """
@@ -226,12 +240,12 @@ def hook():
     hooks.
     """
     # Ensure that the request is from a GitHub server.
+    addr = client_addr(request)
     for network in app.github_networks:
-        if request.remote_addr in network:
+        if addr in network:
             break
     else:
-        app.logger.info('Hook request from disallowed host %s',
-                        request.remote_addr)
+        app.logger.info('Hook request from disallowed host %s', addr)
         return flask.jsonify(status='you != GitHub'), 403
 
     # Dispatch based on event type.
