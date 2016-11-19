@@ -348,7 +348,8 @@ def home():
                     name, _ = fn.rsplit('.', 1)
                     try:
                         user, repo, stamp = name.split('#')
-                        dt = datetime.datetime.strptime(stamp, TIMESTAMP_FORMAT)
+                        dt = datetime.datetime.strptime(stamp,
+                                                        TIMESTAMP_FORMAT)
                     except ValueError:
                         continue
                     logs.append({
