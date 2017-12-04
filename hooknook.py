@@ -27,6 +27,7 @@ app.config.update(
     PUBLIC_URL_FORMAT='https://github.com/{user}/{repo}.git',
     GITHUB_ID=None,
     GITHUB_SECRET=None,
+    GITHUB_HOOK_SUBNETS=None,
     PROXIED=False,
 )
 app.config.from_pyfile('hooknook.cfg', silent=True)
@@ -221,12 +222,17 @@ def app_setup():
         app.worker = Worker()
         app.worker.start()
 
-    # Load the valid GitHub hook server IP ranges from the GitHub API.
+    # Get the valid GitHub hook server IP ranges. This can either be fixed in
+    # the configuration file or loaded automatically from the server.
     if not hasattr(app, 'github_networks'):
-        meta = requests.get('https://api.github.com/meta').json()
-        app.github_networks = []
-        for cidr in meta['hooks']:
-            app.github_networks.append(netaddr.IPNetwork(cidr))
+        if app.config['GITHUB_HOOK_SUBNETS']:
+            cidrs = app.config['GITHUB_HOOK_SUBNETS']
+        else:
+            # Load the from the GitHub public API.
+            meta = requests.get('https://api.github.com/meta').json()
+            cidrs = meta['hooks']
+
+        app.github_networks = [netaddr.IPNetwork(cidr) for cidr in cidrs]
         app.logger.info(
             'Loaded GitHub networks: %s',
             [str(n) for n in app.github_networks]
